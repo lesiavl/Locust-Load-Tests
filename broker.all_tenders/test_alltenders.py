@@ -10,6 +10,14 @@ from time import sleep
 requests_log = logging.getLogger("requests")
 requests_log.setLevel(logging.DEBUG)
 
+base_url = 'https://prozorro.shadowy.eu'
+login_uri = '/api/v1/user/login'
+
+headers = {'Content-Type': 'application/json'}
+login_owner_json = {'login': "butov@mail.ru", 'password': "111"}
+login_provider1_json = {"login": "murashkot@bigmir.net", "password": "24091980"}
+login_provider2_json = {"login": "s.titarchuk@a-express.com.ua", "password": "gfhjkm"}
+
 create_tender_json = {"id": None, "$is_plan": False,
                       "$date": "{}".format(arrow.now()),
                       "items": [{"description": "BelowThreshold_LOAD",
@@ -20,36 +28,29 @@ create_tender_json = {"id": None, "$is_plan": False,
                                  "deliveryAddress": {"streetAddress": u"01034, м.Київ, Шевченківський район, ВУЛИЦЯ ЯРОСЛАВІВ ВАЛ, будинок 38", "locality": u"киев", "region": u"киевская", "postalCode": "01034", "countryName": u"Україна"},
                                  "deliveryDate": {"startDate": "{}".format(arrow.now() + timedelta(days=2)), "endDate": "{}".format(arrow.now() + timedelta(days=3))},
                                  "id": "5f0d1afead1e44a8b6a45c2be35541a2"}],
-                       "title": "BelowThreshold_LOAD", "description": "BelowThreshold_LOAD",
-                       "procurementMethodType": "belowThreshold",
-                       "value": {"amount": 10000, "currency": "UAH", "valueAddedTaxIncluded": False},
-                       "minimalStep": {"amount": 50, "currency": "UAH", "valueAddedTaxIncluded": False},
-                       "$status": "draft",
-                       "tenderID": None,
-                       "enquiryPeriod": {"startDate": "{}".format(arrow.now() + timedelta(minutes=2)),
+                      "title": "BelowThreshold_LOAD", "description": "BelowThreshold_LOAD",
+                      "procurementMethodType": "belowThreshold",
+                      "value": {"amount": 10000, "currency": "UAH", "valueAddedTaxIncluded": False},
+                      "minimalStep": {"amount": 50, "currency": "UAH", "valueAddedTaxIncluded": False},
+                      "$status": "draft",
+                      "tenderID": None,
+                      "enquiryPeriod": {"startDate": "{}".format(arrow.now() + timedelta(minutes=2)),
                                          "endDate": "{}".format(arrow.now() + timedelta(minutes=4))},
-                       "tenderPeriod": {"startDate": "{}".format(arrow.now() + timedelta(minutes=6)),
+                      "tenderPeriod": {"startDate": "{}".format(arrow.now() + timedelta(minutes=6)),
                                         "endDate": "{}".format(arrow.now() + timedelta(hours=1))},
-                       "procuringEntity": {"kind": "general", "name": u"ТОВАРИСТВО З ОБМЕЖЕНОЮ ВІДПОВІДАЛЬНІСТЮ \"ПАУЕР ГРУП\"",
+                      "procuringEntity": {"kind": "general", "name": u"ТОВАРИСТВО З ОБМЕЖЕНОЮ ВІДПОВІДАЛЬНІСТЮ \"ПАУЕР ГРУП\"",
                                           "address":
                                               {"region": u"киевская", "locality": u"киев", "postalCode": "01034", "countryName": u"Україна", "streetAddress": u"01034, м.Київ, Шевченківський район, ВУЛИЦЯ ЯРОСЛАВІВ ВАЛ, будинок 38"},
                                           "name_en": u"LTD \"Pauer group\"",
                                           "identifier": {"id": "35592115", "scheme": "UA-EDR", "legalName": u"ТОВАРИСТВО З ОБМЕЖЕНОЮ ВІДПОВІДАЛЬНІСТЮ \"ПАУЕР ГРУП\"", "legalName_en": "LTD \"Pauer group\""},
                                           "contactPoint": {"url": "http://conan.com", "name": u"Конан Варвар", "email": "barbarian@conan.com", "faxNumber": "333222333", "telephone": "222333222"}},
-                       "mode": "test"}
+                      "mode": "test"}
 
-
-base_url = 'https://prozorro.shadowy.eu'
-login_uri = '/api/v1/user/login'
-
-headers = {'Content-Type': 'application/json'}
-login_owner_json = {'login': "butov@mail.ru", 'password': "111"}
-login_provider1_json = {"login": "murashkot@bigmir.net", "password": "24091980"}
-login_provider2_json = {"login": "s.titarchuk@a-express.com.ua", "password": "gfhjkm"}
 
 session = requests.session()
 
-create_session = session.get(base_url + '/myTender')
+session.get(base_url + '/myTender')
+
 login_response = session.post(
         base_url + login_uri,
         json=login_owner_json,
@@ -115,8 +116,6 @@ get_tender_status = session.get(
 )
 
 tender_status = get_tender_status.json()['data']['status']
-# related_lot = get_tender_status.json()['data']['items'][0]['relatedLot']
-# print related_lot
 
 while tender_status != "active.tendering":
     sleep(20)
@@ -125,12 +124,12 @@ while tender_status != "active.tendering":
         tender_status = r.json()['data']['status']
         print tender_status
 
-login_provider_response = session.post(
+login_provider1_response = session.post(
         base_url + login_uri,
         json=login_provider1_json,
         headers=headers
     )
-print login_provider_response.status_code
+print login_provider1_response.status_code
 
 prepare_bid_response = session.get(base_url + '/api/v1/user/contact/default',
                                    headers=headers
@@ -142,34 +141,43 @@ bid_json = {"value": [{"value": 10000}],
                         "email": "murashkot@bigmir.net", "url": "https://prozorro.shadowy.eu"},
             "features": []}
 
-submit_bid_response = session.post(base_url + '/api/v1/tender/{}/bid'.format(doc_id),
-                                   json=bid_json,
-                                   headers=headers
-                                   )
+bid_draft_response = session.post(base_url + '/api/v1/tender/{}/bid'.format(doc_id),
+                                  json=bid_json,
+                                  headers=headers
+                                  )
+api_bid_id = bid_draft_response.json()['data']['$id']
+print bid_draft_response.status_code, bid_draft_response.content
+
+submit_bid_response = session.post(base_url + '/api/v1/bid/{}/active'.format(api_bid_id),
+                                   headers=headers)
 print submit_bid_response.status_code, submit_bid_response.content
 
-login_provider_response = session.post(
+login_provider2_response = session.post(
         base_url + login_uri,
         json=login_provider2_json,
         headers=headers
     )
-print login_provider_response.status_code
+print login_provider2_response.status_code, login_provider2_response.content
 
 prepare_bid_response = session.get(base_url + '/api/v1/user/contact/default',
                                    headers=headers
                                    )
 print prepare_bid_response.status_code, prepare_bid_response.content
 
-bid_json = {"value": [{"value": 10000}],
-            "contact": {"name": u"Сергей", "telephone": "0503580699",
-                        "email": "s.titarchuk@a-express.com.ua", "url": "https://prozorro.shadowy.eu"},
-            "features": []}
+bid_json_2 = {"value": [{"value": 10000}],
+              "contact": {"name": u"Сергей", "telephone": "0503580699",
+                         "email": "s.titarchuk@a-express.com.ua", "url": "https://prozorro.shadowy.eu"},
+              "features": []}
 
-submit_bid_response = session.post(base_url + '/api/v1/tender/{}/bid'.format(doc_id),
-                                   json=bid_json,
-                                   headers=headers
-                                   )
-print submit_bid_response.status_code, submit_bid_response.content
+bid_draft_response = session.post(base_url + '/api/v1/tender/{}/bid'.format(doc_id),
+                                  json=bid_json_2,
+                                  headers=headers
+                                  )
+print bid_draft_response.status_code, bid_draft_response.content
 
+api_bid_id_2 = bid_draft_response.json()['data']['$id']
 
+submit_bid_response = session.post(base_url + '/api/v1/bid/{}/active'.format(api_bid_id_2),
+                                   headers=headers)
+print submit_bid_response.status_code
 
